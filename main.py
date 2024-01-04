@@ -66,7 +66,7 @@ class AlarmAnalyzer:
                                 'Top 10 Alarms': [owc_top10]}
 
         # Write results to Excel file
-        file_path = 'Report.xlsx'
+        file_path = 'https://github.com/afathelbab/alarms/blob/main/Report.xlsx'
         wb_obj = openpyxl.load_workbook(file_path)
         sheet_obj = wb_obj.active 
 
@@ -241,7 +241,7 @@ class AlarmAnalyzerGUI:
 
     def analyze(self):
         ph_files = glob.glob(os.path.join(self.folder_path, "*.csv"))
-        analyzer = AlarmAnalyzer(ph_files, "saa.csv")
+        analyzer = AlarmAnalyzer(ph_files, "https://github.com/afathelbab/alarms/blob/main/saa.csv")
         analyzer.analyze()
 
 root = tk.Tk()
