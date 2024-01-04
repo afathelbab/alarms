@@ -1,0 +1,250 @@
+import tkinter as tk
+from tkinter import filedialog
+import glob
+import os
+import pandas as pd
+import numpy as np
+import openpyxl
+
+class AlarmAnalyzer:
+    def __init__(self, ph_files, mapping_file):
+        self.ph_dfs = [pd.read_csv(file) for file in ph_files]
+        self.mapping_file = pd.read_csv(mapping_file)
+        self.df = pd.concat(self.ph_dfs, axis=0, ignore_index=True)
+        self.df = self.df[(self.df["Priority"].isin([1, 2, 3])) & (self.df['AlarmState']=='UNACK_ALM')]
+
+    def analyze(self):
+        # Preprocess data
+        self.df.to_csv('df.csv')
+        self.df['Compound'] = self.df['TagName'].apply(lambda x: x.split('.')[0])
+        self.df['EventStamp'] = pd.to_datetime(self.df['EventStamp'])
+        Start_Date = self.df['EventStamp'].min()
+        End_Date = self.df['EventStamp'].max()
+        Duration = End_Date - Start_Date
+        Duration_in_Hours = round(Duration / np.timedelta64(1, 'h'))
+        stations = self.mapping_file.Station.unique()
+        df_compounds = {k: v for (k,v) in self.df.groupby('Compound')}
+        mapping = self.mapping_file[['Station','Compound']]
+        mapping_consoles = {k: v for (k,v) in mapping.groupby('Station')}
+        for k,v in mapping_consoles.items():
+            mapping_consoles[k] = v.drop(columns=['Station'])
+            mapping_consoles[k] = v['Compound'].values.tolist()
+        
+        #Consoles Manpower
+        owc_mp = {'OPC101': 2,
+                  'OPC104': 2,
+                  'OPC129': 2,
+                  'OPC132': 1,
+                  'OPC115': 2,
+                  'OPC140': 1,
+                  'OPC107': 1,
+                  'OPC110': 1,
+                  'OPC135': 1}
+        
+        combined_dict = {k:{u:t for (u,t) in df_compounds.items() if u in v} for (k,v) in mapping_consoles.items() if k in owc_mp}
+
+        results = {}
+        for console in combined_dict.keys():
+            owc_df = pd.concat(combined_dict[console].values(), ignore_index=True)
+            owc_startdate = owc_df['EventStamp'].min()
+            owc_enddate = owc_df['EventStamp'].max()
+            owc_duration = owc_enddate - owc_startdate
+            owc_durationinhours = round(owc_duration / np.timedelta64(1, 'h'))
+            owc_sorted = pd.pivot_table(owc_df, values='EventStamp', index='TagName', aggfunc='count')
+            owc_top10 = owc_sorted.sort_values(by=['EventStamp'], ascending=False).head(10)
+            owc_top10count = owc_top10['EventStamp'].sum()
+            owc_alarmscount = len(owc_df)
+            owc_tier36 = owc_alarmscount/owc_durationinhours/owc_mp[console]
+            owc_top10percent = round(owc_top10count*100/owc_alarmscount)
+
+            results[console] = {'Start Date': [owc_startdate],
+                                'End Date': [owc_enddate],
+                                'Alarms Count': [owc_alarmscount],
+                                'Tier 3.6': [owc_tier36],
+                                'Top 10 Alarms Count': [owc_top10count],
+                                'Top 10 Alarms Percent': [owc_top10percent],
+                                'Top 10 Alarms': [owc_top10]}
+
+        # Write results to Excel file
+        file_path = 'Report.xlsx'
+        wb_obj = openpyxl.load_workbook(file_path)
+        sheet_obj = wb_obj.active 
+
+        # Writing to Excel File
+        # Gas Trains 1 & 2
+        sheet_obj['C5'] = results['OPC101']['Start Date'][0]
+        sheet_obj['C6'] = results['OPC101']['End Date'][0]
+        sheet_obj['C7'] = owc_mp['OPC101']
+        sheet_obj['C8'] = results['OPC101']['Alarms Count'][0]
+        sheet_obj['C9'] = results['OPC101']['Tier 3.6'][0]
+        sheet_obj['C10'] = results['OPC101']['Top 10 Alarms Count'][0]
+        sheet_obj['C11'] = results['OPC101']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_101=results['OPC101']['Top 10 Alarms'][0].index
+        top10_alarms_values_101=results['OPC101']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'B{14+i}'] = top10_alarms_index_101[i]
+            sheet_obj[f'C{14+i}'] = top10_alarms_values_101[i][0]
+
+        # Gas Trains 3 & 4
+        sheet_obj['F5'] = results['OPC104']['Start Date'][0]
+        sheet_obj['F6'] = results['OPC104']['End Date'][0]
+        sheet_obj['F7'] = owc_mp['OPC104']
+        sheet_obj['F8'] = results['OPC104']['Alarms Count'][0]
+        sheet_obj['F9'] = results['OPC104']['Tier 3.6'][0]
+        sheet_obj['F10'] = results['OPC104']['Top 10 Alarms Count'][0]
+        sheet_obj['F11'] = results['OPC104']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_104=results['OPC104']['Top 10 Alarms'][0].index
+        top10_alarms_values_104=results['OPC104']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'E{14+i}'] = top10_alarms_index_104[i]
+            sheet_obj[f'F{14+i}'] = top10_alarms_values_104[i][0]
+
+        # Gas Trains 5 & 6
+        sheet_obj['I5'] = results['OPC129']['Start Date'][0]
+        sheet_obj['I6'] = results['OPC129']['End Date'][0]
+        sheet_obj['I7'] = owc_mp['OPC129']
+        sheet_obj['I8'] = results['OPC129']['Alarms Count'][0]
+        sheet_obj['I9'] = results['OPC129']['Tier 3.6'][0]
+        sheet_obj['I10'] = results['OPC129']['Top 10 Alarms Count'][0]
+        sheet_obj['I11'] = results['OPC129']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_129=results['OPC129']['Top 10 Alarms'][0].index
+        top10_alarms_values_129=results['OPC129']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'H{14+i}'] = top10_alarms_index_129[i]
+            sheet_obj[f'I{14+i}'] = top10_alarms_values_129[i][0]
+
+        # Gas Train 7
+        sheet_obj['C28'] = results['OPC132']['Start Date'][0]
+        sheet_obj['C29'] = results['OPC132']['End Date'][0]
+        sheet_obj['C30'] = owc_mp['OPC132']
+        sheet_obj['C31'] = results['OPC132']['Alarms Count'][0]
+        sheet_obj['C32'] = results['OPC132']['Tier 3.6'][0]
+        sheet_obj['C33'] = results['OPC132']['Top 10 Alarms Count'][0]
+        sheet_obj['C34'] = results['OPC132']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_132=results['OPC132']['Top 10 Alarms'][0].index
+        top10_alarms_values_132=results['OPC132']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'B{37+i}'] = top10_alarms_index_132[i]
+            sheet_obj[f'C{37+i}'] = top10_alarms_values_132[i][0]
+
+        # SRUs 1 & 2
+        sheet_obj['F28'] = results['OPC115']['Start Date'][0]
+        sheet_obj['F29'] = results['OPC115']['End Date'][0]
+        sheet_obj['F30'] = owc_mp['OPC115']
+        sheet_obj['F31'] = results['OPC115']['Alarms Count'][0]
+        sheet_obj['F32'] = results['OPC115']['Tier 3.6'][0]
+        sheet_obj['F33'] = results['OPC115']['Top 10 Alarms Count'][0]
+        sheet_obj['F34'] = results['OPC115']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_115=results['OPC115']['Top 10 Alarms'][0].index
+        top10_alarms_values_115=results['OPC115']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'E{37+i}'] = top10_alarms_index_115[i]
+            sheet_obj[f'F{37+i}'] = top10_alarms_values_115[i][0]
+
+        # SRUs 3 & 4
+        sheet_obj['I28'] = results['OPC140']['Start Date'][0]
+        sheet_obj['I29'] = results['OPC140']['End Date'][0]
+        sheet_obj['I30'] = owc_mp['OPC140']
+        sheet_obj['I31'] = results['OPC140']['Alarms Count'][0]
+        sheet_obj['I32'] = results['OPC140']['Tier 3.6'][0]
+        sheet_obj['I33'] = results['OPC140']['Top 10 Alarms Count'][0]
+        sheet_obj['I34'] = results['OPC140']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_140=results['OPC140']['Top 10 Alarms'][0].index
+        top10_alarms_values_140=results['OPC140']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'H{37+i}'] = top10_alarms_index_140[i]
+            sheet_obj[f'I{37+i}'] = top10_alarms_values_140[i][0]
+
+        # Liquid Trains 1 & 2 - MRUs 1 & 2
+        sheet_obj['C51'] = results['OPC107']['Start Date'][0]
+        sheet_obj['C52'] = results['OPC107']['End Date'][0]
+        sheet_obj['C53'] = owc_mp['OPC107']
+        sheet_obj['C54'] = results['OPC107']['Alarms Count'][0]
+        sheet_obj['C55'] = results['OPC107']['Tier 3.6'][0]
+        sheet_obj['C56'] = results['OPC107']['Top 10 Alarms Count'][0]
+        sheet_obj['C57'] = results['OPC107']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_107=results['OPC107']['Top 10 Alarms'][0].index
+        top10_alarms_values_107=results['OPC107']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'B{60+i}'] = top10_alarms_index_107[i]
+            sheet_obj[f'C{60+i}'] = top10_alarms_values_107[i][0]
+
+        # Utilities Phase 1
+        sheet_obj['F51'] = results['OPC110']['Start Date'][0]
+        sheet_obj['F52'] = results['OPC110']['End Date'][0]
+        sheet_obj['F53'] = owc_mp['OPC110']
+        sheet_obj['F54'] = results['OPC110']['Alarms Count'][0]
+        sheet_obj['F55'] = results['OPC110']['Tier 3.6'][0]
+        sheet_obj['F56'] = results['OPC110']['Top 10 Alarms Count'][0]
+        sheet_obj['F57'] = results['OPC110']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_110=results['OPC110']['Top 10 Alarms'][0].index
+        top10_alarms_values_110=results['OPC110']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'E{60+i}'] = top10_alarms_index_110[i]
+            sheet_obj[f'F{60+i}'] = top10_alarms_values_110[i][0]
+
+        # Utilities Phase 2 - Liquid Train 3
+        sheet_obj['I51'] = results['OPC135']['Start Date'][0]
+        sheet_obj['I52'] = results['OPC135']['End Date'][0]
+        sheet_obj['I53'] = owc_mp['OPC135']
+        sheet_obj['I54'] = results['OPC135']['Alarms Count'][0]
+        sheet_obj['I55'] = results['OPC135']['Tier 3.6'][0]
+        sheet_obj['I56'] = results['OPC135']['Top 10 Alarms Count'][0]
+        sheet_obj['I57'] = results['OPC135']['Top 10 Alarms Percent'][0]/100
+
+        top10_alarms_index_135=results['OPC135']['Top 10 Alarms'][0].index
+        top10_alarms_values_135=results['OPC135']['Top 10 Alarms'][0].values
+
+        for i in range(10):
+            sheet_obj[f'H{60+i}'] = top10_alarms_index_135[i]
+            sheet_obj[f'I{60+i}'] = top10_alarms_values_135[i][0]
+
+
+
+
+        wb_obj.save(file_path)
+
+class AlarmAnalyzerGUI:
+    def __init__(self, master):
+        self.master = master
+        master.title("Alarm Analyzer")
+
+        self.label = tk.Label(master, text="Select the folder containing the data files:")
+        self.label.pack()
+
+        self.select_button = tk.Button(master, text="Select Folder", command=self.select_folder)
+        self.select_button.pack()
+
+        self.analyze_button = tk.Button(master, text="Analyze", command=self.analyze, state=tk.DISABLED)
+        self.analyze_button.pack()
+
+    def select_folder(self):
+        self.folder_path = filedialog.askdirectory()
+        if self.folder_path:
+            self.analyze_button.config(state=tk.NORMAL)
+
+    def analyze(self):
+        ph_files = glob.glob(os.path.join(self.folder_path, "*.csv"))
+        analyzer = AlarmAnalyzer(ph_files, "saa.csv")
+        analyzer.analyze()
+
+root = tk.Tk()
+gui = AlarmAnalyzerGUI(root)
+root.mainloop()
+
