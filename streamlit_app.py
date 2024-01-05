@@ -10,7 +10,6 @@ def load_mapping_file():
 
 # Function to handle file uploads and analysis
 def analyze_data():
-    ph_files = st.file_uploader("Upload alarms log files (CSV format)", type="csv", accept_multiple_files=True)
     if ph_files is not None:
         mapping_file = load_mapping_file()
 
@@ -236,7 +235,9 @@ def create_excel_output(results_df):
     st.download_button(label="Download Results Report", data=workbook, file_name="Analysis Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # Main app structure
+
 st.title("Alarm Analyzer App")
+ph_files = st.file_uploader("Upload alarms log files (CSV format)", type="csv", accept_multiple_files=True)
 
 if st.button("Analyze"):
     analyze_data()
