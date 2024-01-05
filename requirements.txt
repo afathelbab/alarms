@@ -1,5 +1,4 @@
 pandas
 numpy
 openpyxl
-glob
-os
+streamlit
