@@ -3,16 +3,13 @@ import pandas as pd
 import numpy as np
 import openpyxl
 
-# Function to load the mapping file from GitHub
-def load_mapping_file():
-    url = "https://github.com/afathelbab/alarms/blob/main/saa.csv"
-    return pd.read_csv(url, on_bad_lines='skip')
+url = "https://github.com/afathelbab/alarms/blob/main/saa.csv"
+ mapping_file = pd.read_csv(url, on_bad_lines='skip')
 
 # Function to handle file uploads and analysis
 def analyze_data():
     if ph_files is not None:
-        mapping_file = load_mapping_file()
-
+        
         # Combine PH files into a single DataFrame
         combined_df = pd.concat([pd.read_csv(file) for file in ph_files])
 
@@ -26,7 +23,7 @@ def analyze_data():
         filtered_df["Compound"] = filtered_df["TagName"].str.split(".").str[0]
 
         # Use mapping file to assign alarms to consoles
-        stations = mapping_file[["Station"]].unique()
+        stations = mapping_file[1].unique()
         df_compounds = {k: v for (k,v) in filtered_df.groupby('Compound')}
         mapping = mapping_file[['Station','Compound']]
         mapping_consoles = {k: v for (k,v) in mapping.groupby('Station')}
