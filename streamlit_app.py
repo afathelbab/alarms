@@ -26,7 +26,7 @@ def analyze_data():
         filtered_df["Compound"] = filtered_df["TagName"].str.split(".").str[0]
 
         # Use mapping file to assign alarms to consoles
-        stations = mapping_file["Station"].unique()
+        stations = mapping_file[["Station"]].unique()
         df_compounds = {k: v for (k,v) in filtered_df.groupby('Compound')}
         mapping = mapping_file[['Station','Compound']]
         mapping_consoles = {k: v for (k,v) in mapping.groupby('Station')}
