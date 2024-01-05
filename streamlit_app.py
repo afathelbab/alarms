@@ -3,15 +3,14 @@ import pandas as pd
 import numpy as np
 import openpyxl
 
-url = "https://github.com/afathelbab/alarms/blob/main/saa.csv"
-mapping_file = pd.read_csv(url, on_bad_lines='skip')
-
 # Function to handle file uploads and analysis
 def analyze_data():
     if ph_files is not None:
         
         # Combine PH files into a single DataFrame
         combined_df = pd.concat([pd.read_csv(file) for file in ph_files])
+
+        mapping_file = pd.read_csv(saa, on_bad_lines='skip')
 
         # Filter by priority and alarm state
         filtered_df = combined_df[
@@ -23,8 +22,7 @@ def analyze_data():
         filtered_df["Compound"] = filtered_df["TagName"].str.split(".").str[0]
 
         # Use mapping file to assign alarms to consoles
-        column_by_index = mapping_file[1]  # Access the second column (index 1)
-        stations = column_by_index.unique()
+        stations = mapping_file['Station'].unique()
         df_compounds = {k: v for (k,v) in filtered_df.groupby('Compound')}
         mapping = mapping_file[['Station','Compound']]
         mapping_consoles = {k: v for (k,v) in mapping.groupby('Station')}
@@ -236,6 +234,7 @@ def create_excel_output(results_df):
 
 st.title("Alarm Analyzer App")
 ph_files = st.file_uploader("Upload alarms log files (CSV format)", type="csv", accept_multiple_files=True)
+saa = st.file_uploader("Upload Stations Assignment file (CSV format)", type="csv", accept_multiple_files=False)
 
 if st.button("Analyze"):
     analyze_data()
