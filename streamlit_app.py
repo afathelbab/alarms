@@ -4,7 +4,7 @@ import numpy as np
 import openpyxl
 
 url = "https://github.com/afathelbab/alarms/blob/main/saa.csv"
- mapping_file = pd.read_csv(url, on_bad_lines='skip')
+mapping_file = pd.read_csv(url, on_bad_lines='skip')
 
 # Function to handle file uploads and analysis
 def analyze_data():
