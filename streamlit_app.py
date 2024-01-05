@@ -5,7 +5,7 @@ import openpyxl
 
 # Function to load the mapping file from GitHub
 def load_mapping_file():
-    url = "https://github.com/afathelbab/alarms/blob/837d5ec6c84c1bdd766cc293b3c8118cf2db8c70/saa.csv"
+    url = "https://github.com/afathelbab/alarms/saa.csv"
     return pd.read_csv(url)
 
 # Function to handle file uploads and analysis
